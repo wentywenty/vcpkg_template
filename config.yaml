@@ -1,3 +1,2 @@
 runneradmin:
-  MAIN_PATH: C:\Users\runneradmin\scoop\apps\vcpkg\current
-  
+  VCPKG_ROOT: C:\Users\runneradmin\scoop\apps\vcpkg\current

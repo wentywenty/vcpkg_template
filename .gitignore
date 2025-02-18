@@ -5,6 +5,7 @@ Debug/
 .cache/
 .target/
 .venv/
-# env.ps1
+env.ps1
 # vcpkg.json
-# CMakeUserPresets.json
+CMakeUserPresets.json
+config.yaml

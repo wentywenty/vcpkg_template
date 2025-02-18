@@ -4,97 +4,123 @@
 import yaml
 import os
 import json
-import subprocess
 import getpass
 import sys
-import locale
+from typing import Dict, List, Optional
+from pathlib import Path
 
-def set_powershell_env():
-    try:
-        # 设置控制台输出编码
+class ConfigurationError(Exception):
+    """配置相关的异常基类"""
+    pass
+
+class ConsoleHelper:
+    @staticmethod
+    def setup_encoding():
+        """设置控制台编码"""
         if sys.platform == 'win32':
             if sys.stdout.encoding != 'utf-8':
                 sys.stdout.reconfigure(encoding='utf-8')
-            if os.environ.get('CI'):  # 在 CI 环境中
-                os.system('chcp 65001')  # 设置控制台代码页为 UTF-8
-        
-        # 获取当前用户名
-        current_user = getpass.getuser()
-        
-        # 读取配置文件
-        config_path = os.path.join(os.path.dirname(__file__), 'config.yaml')
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = yaml.safe_load(f)
-        
-        # 获取用户配置
-        user_config = config.get(current_user, config.get('other', {}))
-        
-        # 生成 PowerShell 命令脚本，增加编码设置
-        ps_commands = [
+            if os.environ.get('CI'):
+                os.system('chcp 65001')
+
+    @staticmethod
+    def safe_print(message: str):
+        """安全打印，处理编码问题"""
+        try:
+            print(message)
+        except UnicodeEncodeError:
+            print(message.encode('ascii', 'replace').decode())
+
+class ConfigManager:
+    def __init__(self, base_path: Path):
+        self.base_path = base_path
+        self.config_path = base_path / 'config.yaml'
+        self.script_path = base_path / 'env.ps1'
+        self.cmake_presets_path = base_path / 'CMakeUserPresets.json'
+        self.user_config: Dict = {}
+
+    def load_config(self) -> None:
+        """加载配置文件"""
+        try:
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+            
+            current_user = getpass.getuser()
+            self.user_config = config.get(current_user, config.get('other', {}))
+            if not self.user_config:
+                raise ConfigurationError(f"No configuration found for user {current_user}")
+        except Exception as e:
+            raise ConfigurationError(f"Failed to load config: {str(e)}")
+
+    def generate_ps_commands(self) -> List[str]:
+        """生成PowerShell命令"""
+        commands = [
             '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8',
             '$OutputEncoding = [System.Text.Encoding]::UTF8'
         ]
         
-        for key, value in user_config.items():
-            ps_commands.append(f'$env:{key}="{value}"')
-            try:
-                print(f'Setting environment variable: {key}={value}')
-            except UnicodeEncodeError:
-                print(f'Setting var: {key}={value}'.encode('ascii', 'replace').decode())
+        for key, value in self.user_config.items():
+            commands.append(f'$env:{key}="{value}"')
+            ConsoleHelper.safe_print(f'Setting environment variable: {key}={value}')
         
-        # 将命令写入临时脚本
-        script_path = os.path.join(os.path.dirname(__file__), 'env.ps1')
-        with open(script_path, 'w', encoding='utf-8-sig') as f:  # 使用带 BOM 的 UTF-8
-            f.write('\n'.join(ps_commands))
-        
-        # 更新 CMakeUserPresets.json
-        if 'MAIN_PATH' in user_config:
-            json_file_path = os.path.join(os.path.dirname(__file__), 'CMakeUserPresets.json')
-            if os.path.exists(json_file_path):
-                update_vcpkg_root(json_file_path, user_config['MAIN_PATH'])
-                print(f'Updated VCPKG_ROOT to: {user_config["MAIN_PATH"]}')
-            else:
-                print('Warning: CMakeUserPresets.json not found')
-        
-        print("\nRun the following command in PowerShell to set environment variables:")
-        print(f". {script_path}")
-        
-    except Exception as e:
-        print(f"Error: {str(e)}", file=sys.stderr)
-        return False
-    
-    return True
+        return commands
 
-def update_vcpkg_root(json_file_path, main_path):
+    def write_ps_script(self, commands: List[str]) -> None:
+        """写入PowerShell脚本"""
+        try:
+            with open(self.script_path, 'w', encoding='utf-8-sig') as f:
+                f.write('\n'.join(commands))
+        except Exception as e:
+            raise ConfigurationError(f"Failed to write PowerShell script: {str(e)}")
+
+    def update_cmake_presets(self) -> None:
+        """更新CMake预设文件"""
+        if 'VCPKG_ROOT' not in self.user_config:
+            return
+
+        if not self.cmake_presets_path.exists():
+            ConsoleHelper.safe_print('Warning: CMakeUserPresets.json not found')
+            return
+
+        try:
+            with open(self.cmake_presets_path, 'r', encoding='utf-8') as f:
+                content = json.load(f)
+
+            vcpkg_root = os.path.normpath(self.user_config['VCPKG_ROOT'])
+            for preset in content.get('configurePresets', []):
+                if 'VCPKG_ROOT' in preset.get('environment', {}):
+                    preset['environment']['VCPKG_ROOT'] = vcpkg_root
+
+            with open(self.cmake_presets_path, 'w', encoding='utf-8') as f:
+                json.dump(content, f, indent=4)
+
+            ConsoleHelper.safe_print(f'Updated VCPKG_ROOT to: {vcpkg_root}')
+        except Exception as e:
+            raise ConfigurationError(f"Failed to update CMake presets: {str(e)}")
+
+def main() -> int:
+    """主函数"""
     try:
-        # 读取 JSON 文件
-        with open(json_file_path, 'r', encoding='utf-8') as file:
-            json_content = json.load(file)
-
-        # 更新 VCPKG_ROOT 路径
-        for preset in json_content.get('configurePresets', []):
-            if 'VCPKG_ROOT' in preset.get('environment', {}):
-                corrected_main_path = os.path.normpath(main_path)
-                preset['environment']['VCPKG_ROOT'] = corrected_main_path
-
-        # 保存更新后的 JSON 文件
-        with open(json_file_path, 'w', encoding='utf-8') as file:
-            json.dump(json_content, file, indent=4)
-            
+        ConsoleHelper.setup_encoding()
+        
+        config_manager = ConfigManager(Path(__file__).parent)
+        config_manager.load_config()
+        
+        ps_commands = config_manager.generate_ps_commands()
+        config_manager.write_ps_script(ps_commands)
+        config_manager.update_cmake_presets()
+        
+        ConsoleHelper.safe_print("\nRun the following command in PowerShell to set environment variables:")
+        ConsoleHelper.safe_print(f". {config_manager.script_path}")
+        ConsoleHelper.safe_print("\nConfiguration completed!")
+        return 0
+        
+    except ConfigurationError as e:
+        print(f"Configuration error: {str(e)}", file=sys.stderr)
+        return 1
     except Exception as e:
-        print(f"更新 VCPKG_ROOT 时出错: {str(e)}")
-        return False
-    
-    return True
+        print(f"Unexpected error: {str(e)}", file=sys.stderr)
+        return 1
 
 if __name__ == '__main__':
-    # 设置默认编码
-    if sys.platform == 'win32':
-        if os.environ.get('CI'):
-            os.system('chcp 65001')
-    
-    if set_powershell_env():
-        print("\nConfiguration completed!")
-    else:
-        print("\nConfiguration failed!")
-        sys.exit(1)
+    sys.exit(main())

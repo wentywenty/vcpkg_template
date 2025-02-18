@@ -1,15 +1,8 @@
 {
-  "name": "vcpkg_template", 
+  "name": "vcpkgtemplate", 
   "version-string": "1.1.0",
   "dependencies": [
-    "libffi",
-    "boost",
-    "wxwidgets",
-    "mlpack",
-    "gtest",
-    "yaml-cpp",
-    "lua",
-    "behaviortree-cpp"
+    "libffi"
   ],
   "builtin-baseline": "6f29f12e82a8293156836ad81cc9bf5af41fe836",
   "overrides": [
