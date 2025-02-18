@@ -1,0 +1,88 @@
+name: fira CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        config: [Debug, Release]
+        to_cache_dir: 
+          - C:\Users\runneradmin\scoop
+    env:
+      packages_to_install: cmake python vcpkg uv
+      cache_version: v4.2.0
+      cache_hash_seed_file_path: '.github/workflows/cache_seed_file_for_scoop.txt'
+      VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+      VCPKG_DOWNLOADS: '.\build\vcpkg_downloads'
+
+    steps:
+
+    - name: Checkout code
+      uses: actions/checkout@v4.2.2
+      
+    - name: Create cache seed file
+      run: echo ${{ env.packages_to_install }} >> ${{ env.cache_hash_seed_file_path }}
+
+    - name: Restore cache if available
+      id: restore_cache
+      uses: actions/cache@v4.2.0
+      with:
+        path: ${{ matrix.to_cache_dir }}
+        key: cache_version_${{ env.cache_version }}-${{ hashFiles(env.cache_hash_seed_file_path) }}
+
+    - name: Install scoop (Windows)
+      uses: MinoruSekine/setup-scoop@v4.0.1
+      if: steps.restore_cache.outputs.cache-hit != 'true'
+      with:
+        install_scoop: 'true'
+        buckets: main
+        apps: ${{ env.packages_to_install }}
+        scoop_update: 'true'
+        update_path: 'true'
+
+    - name: Setup scoop PATH (Windows)
+      uses: MinoruSekine/setup-scoop@v4.0.1
+      if: steps.restore_cache.outputs.cache-hit == 'true'
+      with:
+        install_scoop: 'false'
+        scoop_update: 'false'
+        update_path: 'true'
+
+    - name: Set up Visual Studio shell
+      uses: egor-tensin/vs-shell@v2
+      with:
+        arch: Win32
+
+    - name: Export GitHub Actions cache environment variables
+      uses: actions/github-script@v7.0.1
+      with:
+        script: |
+          core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+          core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+    - name: Set up solution
+      shell: pwsh
+      run: | 
+        cd ${{ github.workspace }}
+        uv venv
+        uv pip install pyyaml
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+        $env:PYTHONIOENCODING = "utf-8"
+        .venv\Scripts\activate
+        python getenv.py
+        ./env.ps1
+
+    - name: Build solution
+      shell: pwsh
+      run: |
+        cd ${{ github.workspace }} 
+        cmake -G "Visual Studio 17 2022" -A Win32 --preset=default .
+
+    - name: Build 
+      shell: pwsh
+      run: |
+        cd ${{ github.workspace }} 
+        cmake --build build --config ${{ matrix.config }} -- /p:Platform=Win32

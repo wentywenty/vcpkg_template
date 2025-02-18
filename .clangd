@@ -1,0 +1,5 @@
+# Fragment common to C and C++ source files
+CompileFlags:
+    Add:
+        - "--include-directory=./include"
+        - "--include-directory=../cmake/build/vcpkg_installed/x86-windows/include"

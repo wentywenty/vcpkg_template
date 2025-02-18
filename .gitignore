@@ -1,0 +1,10 @@
+build/
+Release/
+.vs/
+Debug/
+.cache/
+.target/
+.venv/
+# env.ps1
+# vcpkg.json
+# CMakeUserPresets.json
