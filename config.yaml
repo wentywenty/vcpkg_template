@@ -1,2 +1,5 @@
 runneradmin:
   VCPKG_ROOT: C:\Users\runneradmin\scoop\apps\vcpkg\current
+
+yjb23:
+  VCPKG_ROOT: D:\scoop\apps\vcpkg\current

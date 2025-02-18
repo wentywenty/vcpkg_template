@@ -5,7 +5,7 @@
             "name": "default",
             "inherits": "vcpkg",
             "environment": {
-                "VCPKG_ROOT": "C:\\Users\\runneradmin\\scoop\\apps\\vcpkg\\current"
+                "VCPKG_ROOT": "D:\\scoop\\apps\\vcpkg\\current"
             }
         }
     ]

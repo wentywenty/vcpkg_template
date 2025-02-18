@@ -18,6 +18,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # 找依赖包
 # ##################################################################
 
+find_package(libffi CONFIG REQUIRED)
+
 # ##################################################################
 # 添加子项目
 # ##################################################################
@@ -25,6 +27,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # 添加头文件目录
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
+    ${LIBFFI_INCLUDE_DIRS}
 )
 
 # 添加源文件
@@ -39,20 +42,8 @@ set(SOURCES
 # 生成可执行文件
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-# 设置编译选项
-target_compile_options(target PRIVATE
-    $<$<CONFIG:Debug>:/D_DEBUG /MTd /Zi /Ob0 /Od /RTC1>
-    $<$<CONFIG:Release>:/DNDEBUG /MT /O2 /Ob2 /Oi /Ot /Oy /GL /Gy>
-)
-
-# 链接库
-target_link_libraries(target PRIVATE)
-
-# 设置链接选项
-target_link_options(target PRIVATE
-    $<$<CONFIG:Debug>:/INCREMENTAL>
-    $<$<CONFIG:Release>:/INCREMENTAL:NO /LTCG /OPT:REF /OPT:ICF>
-)
+# 添加链接库
+target_link_libraries(${PROJECT_NAME} PRIVATE libffi)
 
 # ##################################################################
 # 后续工作
