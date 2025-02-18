@@ -19,6 +19,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # ##################################################################
 
 find_package(libffi CONFIG REQUIRED)
+find_path(LIBFFI_INCLUDE_DIR ffi.h PATH_SUFFIXES libffi)
 
 # ##################################################################
 # 添加子项目
@@ -27,7 +28,7 @@ find_package(libffi CONFIG REQUIRED)
 # 添加头文件目录
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
-    ${LIBFFI_INCLUDE_DIRS}
+    ${LIBFFI_INCLUDE_DIR}
 )
 
 # 添加源文件
@@ -44,6 +45,7 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 
 # 添加链接库
 target_link_libraries(${PROJECT_NAME} PRIVATE libffi)
+target_include_directories(${PROJECT_NAME} PRIVATE ${LIBFFI_INCLUDE_DIR})
 
 # ##################################################################
 # 后续工作
