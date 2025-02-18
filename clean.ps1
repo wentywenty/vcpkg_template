@@ -1,36 +1,107 @@
-# 主函数，根据参数调用不同的清理函数
 param (
-    [string]$cleanType = "medium"  # 默认是中编译清理
+    [ValidateSet("full", "small", "medium")]
+    [string]$cleanType = "medium"
 )
 
-# 大编译清理
-function Clean-FullBuild {
-    Write-Host "Performing full build clean..."
-    # 清理所有生成的文件和目录
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue ./build/*
-    Write-Host "Full build clean completed."
+# 公共函数：输出彩色日志
+function Write-ColorLog {
+    param (
+        [string]$Message,
+        [string]$Color = "White"
+    )
+    Write-Host $Message -ForegroundColor $Color
 }
 
-# 小编译清理
-function Clean-SmallBuild {
-    Write-Host "Performing small build clean..."
-    # 清理特定的生成文件
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue ./build/Debug/*
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue ./build/Win32/*
-    Write-Host "Small build clean completed."
+# 公共函数：验证目录是否存在
+function Test-DirectoryExists {
+    param (
+        [string]$Path
+    )
+    if (!(Test-Path $Path)) {
+        Write-ColorLog "Directory not found: $Path" "Yellow"
+        return $false
+    }
+    return $true
 }
 
-# 中编译清理
-function Clean-MediumBuild {
-    Write-Host "Performing medium build clean..."
-    # 清理部分生成文件和目录
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue ./build/CMakeFiles/*
-    Write-Host "Medium build clean completed."
+# 公共函数：执行清理操作
+function Remove-BuildFiles {
+    param (
+        [string]$Path
+    )
+    try {
+        if (Test-Path $Path) {
+            Remove-Item -Recurse -Force -ErrorAction Stop $Path
+            Write-ColorLog "Successfully cleaned: $Path" "Green"
+        }
+    }
+    catch {
+        Write-ColorLog "Failed to clean: $Path. Error: $_" "Red"
+        return $false
+    }
+    return $true
 }
 
-switch ($cleanType) {
-    "full" { Clean-FullBuild }
-    "small" { Clean-SmallBuild }
-    "medium" { Clean-MediumBuild }
-    default { Write-Host "Unknown clean type: $cleanType" }
+# 完整清理
+function Clear-FullBuild {
+    Write-ColorLog "Starting full build clean..." "Cyan"
+    
+    $success = Remove-BuildFiles "./build/*"
+    
+    if ($success) {
+        Write-ColorLog "Full build clean completed successfully." "Green"
+    }
+    else {
+        Write-ColorLog "Full build clean completed with errors." "Yellow"
+    }
+}
+
+# 小规模清理
+function Clear-SmallBuild {
+    Write-ColorLog "Starting small build clean..." "Cyan"
+    
+    $success = $true
+    $success = $success -and (Remove-BuildFiles "./build/Debug/*")
+    $success = $success -and (Remove-BuildFiles "./build/Win32/*")
+    
+    if ($success) {
+        Write-ColorLog "Small build clean completed successfully." "Green"
+    }
+    else {
+        Write-ColorLog "Small build clean completed with errors." "Yellow"
+    }
+}
+
+# 中等规模清理
+function Clear-MediumBuild {
+    Write-ColorLog "Starting medium build clean..." "Cyan"
+    
+    $success = Remove-BuildFiles "./build/CMakeFiles/*"
+    
+    if ($success) {
+        Write-ColorLog "Medium build clean completed successfully." "Green"
+    }
+    else {
+        Write-ColorLog "Medium build clean completed with errors." "Yellow"
+    }
+}
+
+# 主执行逻辑
+try {
+    if (!(Test-DirectoryExists "./build")) {
+        Write-ColorLog "Build directory does not exist. Nothing to clean." "Yellow"
+        exit 0
+    }
+
+    Write-ColorLog "Starting clean operation with type: $cleanType" "White"
+    
+    switch ($cleanType) {
+        "full" { Clear-FullBuild }
+        "small" { Clear-SmallBuild }
+        "medium" { Clear-MediumBuild }
+    }
+}
+catch {
+    Write-ColorLog "An unexpected error occurred: $_" "Red"
+    exit 1
 }
